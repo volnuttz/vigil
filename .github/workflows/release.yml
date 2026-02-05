@@ -1,9 +1,11 @@
-name: Release
+name: Manual Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (vX.Y.Z)"
+        required: true
 
 permissions:
   contents: write
@@ -12,8 +14,33 @@ jobs:
   release:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: cargo build --release
-      - uses: softprops/action-gh-release@v2
+      # 1️⃣ Checkout the repo
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2️⃣ Configure git
+      - name: Setup git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+      # 3️⃣ Create and push the tag
+      - name: Create and push tag
+        run: |
+          VERSION="${{ inputs.version }}"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
+      # 4️⃣ Build Rust project
+      - name: Build release
+        run: cargo build --release
+
+      # 5️⃣ Publish GitHub release
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           files: target/release/vigil
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
