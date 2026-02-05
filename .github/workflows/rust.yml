@@ -15,13 +15,14 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
     - name: Build
       run: cargo build --release
     - name: Run tests
       run: cargo test --verbose
-    - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v6.0.0
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: github.ref_type == 'tag'
       with:
-        path: target/release/vigil
-          
+        files: target/release/vigil
