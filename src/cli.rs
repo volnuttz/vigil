@@ -8,9 +8,9 @@ use crate::ssh;
 #[derive(Parser, Debug)]
 #[command(name = "vigil", version, about = "Persistent remote tmux sessions over SSH", trailing_var_arg = true)]
 pub struct Cli {
-    /// Base tmux session name (will be suffixed with local user)
-    #[arg(long = "session", default_value = "default")]
-    pub session: String,
+    /// Base tmux session name (if omitted, uses "default" and will be suffixed with local user)
+    #[arg(long = "session", value_name = "NAME")]
+    pub session: Option<String>,
 
     /// tmux binary on the remote host
     #[arg(long = "tmux", default_value = "tmux")]
@@ -51,6 +51,29 @@ impl Cli {
             if tok == "--list" && !parsed.list {
                 parsed.list = true;
                 parsed.ssh_args.remove(i);
+                continue;
+            }
+            // Hoist --session NAME or --session=NAME when passed after the host
+            if tok == "--session" || tok.starts_with("--session=") {
+                // Remove the token from ssh_args
+                parsed.ssh_args.remove(i);
+
+                // Handle --session=NAME form
+                if tok.starts_with("--session=") {
+                    if let Some(val) = tok.splitn(2, '=').nth(1) {
+                        parsed.session = Some(val.to_string());
+                    }
+                    continue;
+                }
+
+                // Handle --session NAME form: next token is the name if it's not a flag/host
+                if i < parsed.ssh_args.len() {
+                    let next = &parsed.ssh_args[i];
+                    if !next.starts_with('-') && !next.contains('@') && !next.contains(':') {
+                        let name = parsed.ssh_args.remove(i);
+                        parsed.session = Some(name);
+                    }
+                }
                 continue;
             }
             if (tok == "--attach" || tok == "--select") && parsed.attach.is_none() {
@@ -106,8 +129,12 @@ impl Cli {
         let (ssh_prog, ssh_args) = ssh::infer_ssh_prog(&self.ssh_args)?;
         let debug = std::env::var_os("VIGIL_DEBUG").is_some();
 
+        let session_str = self.session.clone().unwrap_or_else(|| "default".to_string());
+        let session_provided = self.session.is_some();
+
         Ok(Config::new(
-            self.session,
+            session_str,
+            session_provided,
             self.tmux_bin,
             self.tmux_args,
             ssh_prog,

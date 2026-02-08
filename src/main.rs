@@ -97,8 +97,14 @@ fn main() -> Result<()> {
             }
         }
         None => {
-            // Default behavior: create/attach to user-scoped session
-            format!("{}_{}", config.session, config.local_user)
+            // Default behavior: create/attach to user-scoped session. If the
+            // user explicitly provided a session name, use it verbatim; otherwise
+            // append the local user to the default base session.
+            if config.session_provided {
+                config.session.clone()
+            } else {
+                format!("{}_{}", config.session, config.local_user)
+            }
         }
     };
 
